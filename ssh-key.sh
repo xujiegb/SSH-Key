@@ -6,12 +6,14 @@ die(){ echo "Error: $*" >&2; exit 1; }
 have(){ command -v "$1" >/dev/null 2>&1; }
 trim(){ awk '{$1=$1}1'; }
 is_yes(){ case "$1" in [Yy]) return 0;; *) return 1;; esac; }
+is_macos(){ [[ "$(uname -s)" == "Darwin" ]]; }
+is_linux(){ [[ "$(uname -s)" == "Linux" ]]; }
 
 if ! have ssh-keygen; then
   die "ssh-keygen not found. Please install OpenSSH client."
 fi
 
-# Detect original user's Downloads even under sudo
+# Detect original user's HOME even under sudo
 resolve_user_home(){
   if [[ -n "${SUDO_USER-}" && "$SUDO_USER" != "root" ]]; then
     eval echo "~$SUDO_USER"
@@ -20,15 +22,38 @@ resolve_user_home(){
   fi
 }
 
+# Best-effort Downloads dir
+detect_downloads_dir(){
+  local home dl
+  home="$(resolve_user_home)"
+  if is_macos; then
+    dl="$home/Downloads"
+  elif is_linux; then
+    # Try XDG from user-dirs.dirs
+    local xdg_file="$home/.config/user-dirs.dirs"
+    if [[ -f "$xdg_file" ]]; then
+      # shellcheck disable=SC2016
+      dl="$(. "$xdg_file"; printf '%s' "${XDG_DOWNLOAD_DIR:-$home/Downloads}")"
+      # Expand $HOME inside value if present
+      dl="${dl/\$HOME/$home}"
+    else
+      dl="$home/Downloads"
+    fi
+  else
+    dl="$home/Downloads"
+  fi
+  echo "$dl"
+}
+
 timestamp(){ date +"%Y%m%d-%H%M%S"; }
 
 make_export_dir(){
-  local base home dl t
-  home="$(resolve_user_home)"
-  dl="$home/Downloads"
+  local dl t out
+  dl="$(detect_downloads_dir)"
   t="$(timestamp)"
-  mkdir -p "$dl/$t"
-  echo "$dl/$t"
+  out="$dl/$t"
+  mkdir -p "$out"
+  echo "$out"
 }
 
 read_line(){ # prompt -> var
@@ -39,10 +64,39 @@ read_line(){ # prompt -> var
 
 press_enter(){ read -r -p "$MSG_PRESS_ENTER" _; }
 
+safe_clear(){ if have clear; then clear; fi; }
+
+# Open export folder in GUI (macOS Finder / Linux desktop file manager)
+open_folder_gui(){
+  local dir="$1" opener=""
+  if is_macos && have open; then
+    open "$dir" >/dev/null 2>&1 || true
+    return
+  fi
+  if is_linux; then
+    if   have xdg-open;    then opener="xdg-open"
+    elif have gio;         then opener="gio open"
+    elif have kioclient5;  then opener="kioclient5 exec"
+    elif have dolphin;     then opener="dolphin"
+    elif have nautilus;    then opener="nautilus"
+    elif have nemo;        then opener="nemo"
+    elif have thunar;      then opener="thunar"
+    elif have pcmanfm;     then opener="pcmanfm"
+    else
+      return 0
+    fi
+    # Try to use the original desktop user under sudo
+    if [[ -n "${SUDO_USER-}" && "$SUDO_USER" != "root" ]]; then
+      sudo -u "$SUDO_USER" -H env DISPLAY="${DISPLAY-:0}" XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR-}" \
+        $opener "$dir" >/dev/null 2>&1 & disown || true
+    else
+      $opener "$dir" >/dev/null 2>&1 & disown || true
+    fi
+  fi
+}
+
 # --- i18n -------------------------------------------------------------------
-# Default English
 LANG_ID="en"
-if [[ -n "${LANG-}" ]]; then :; fi
 
 choose_lang(){
   cat <<'EOF'
@@ -153,7 +207,7 @@ set_texts(){
     MSG_PATH="مسیر فایل را وارد کنید: "
     MSG_SHOW_PRIV="--- کلید خصوصی ---"
     MSG_SHOW_PUB="--- کلید عمومی ---"
-    MSG_EXPORT="خروجی گرفتن به فایل‌ها؟ [y/N]: "
+    MSG_EXPORT="خروجی گرفتن به فایل‌ها؟ [y/N] : "
     MSG_EXPORTED_TO="ذخیره شد در:"
     MSG_PRESS_ENTER="برای ادامه Enter را بزنید…"
     MSG_DONE="انجام شد."
@@ -168,7 +222,7 @@ set_texts(){
     MSG_PATH="ファイルパスを入力: "
     MSG_SHOW_PRIV="--- 秘密鍵 ---"
     MSG_SHOW_PUB="--- 公開鍵 ---"
-    MSG_EXPORT="ファイルへ出力しますか？ [y/N]: "
+    MSG_EXPORT="ファイルへ出力しますか？ [y/N] : "
     MSG_EXPORTED_TO="出力先:"
     MSG_PRESS_ENTER="続行するには Enter を押してください…"
     MSG_DONE="完了しました。"
@@ -181,8 +235,7 @@ set_texts(){
 generate_key(){
   echo "$MSG_ALGO"
   read -r -p "> " algo
-  local type bits comment tmpdir keyfile pubfile
-  comment="${USER:-user}-$(timestamp)"
+  local type bits tmpdir keyfile pubfile
   tmpdir="$(mktemp -d)"
   keyfile="$tmpdir/id_tmp"
   pubfile="$keyfile.pub"
@@ -198,7 +251,7 @@ generate_key(){
   if [[ "$type" == "rsa" ]]; then
     ssh-keygen -t rsa -b "$bits" -N "" -C "$type-$bits-$(timestamp)" -f "$keyfile" >/dev/null
   else
-    ssh-keygen -t ed25519 -a 100 -N "" -C "ed25519-$(timestamp)" -f "$keyfile" >/devnull 2>&1
+    ssh-keygen -t ed25519 -a 100 -N "" -C "ed25519-$(timestamp)" -f "$keyfile" >/dev/null 2>&1
   fi
 
   echo "$MSG_SHOW_PRIV"
@@ -211,7 +264,6 @@ generate_key(){
   read -r -p "$MSG_EXPORT" ans
   if is_yes "$ans"; then
     outdir="$(make_export_dir)"
-    # give readable names
     if [[ "$type" == "rsa" ]]; then
       cp "$keyfile"     "$outdir/id_rsa_${bits}"
       cp "$pubfile"     "$outdir/id_rsa_${bits}.pub"
@@ -221,6 +273,7 @@ generate_key(){
       cp "$pubfile"     "$outdir/id_ed25519.pub"
       echo "$MSG_EXPORTED_TO $outdir/id_ed25519  /  $outdir/id_ed25519.pub"
     fi
+    open_folder_gui "$outdir"
   fi
   rm -rf "$tmpdir"
   echo "$MSG_DONE"; press_enter
@@ -234,9 +287,7 @@ derive_public(){
 
   if [[ "$im" == "1" ]]; then
     echo "$MSG_PASTE"
-    # read until empty line
-    {
-      while IFS= read -r line; do
+    { while IFS= read -r line; do
         [[ -z "$line" ]] && break
         echo "$line"
       done
@@ -250,7 +301,6 @@ derive_public(){
     echo "$MSG_INVALID"; return
   fi
 
-  # Try derive
   if pub=$(ssh-keygen -y -f "$tmpfile" 2>/dev/null); then
     echo "$MSG_SHOW_PUB"
     echo "$pub"
@@ -261,6 +311,7 @@ derive_public(){
       cp "$tmpfile" "$outdir/derived_private"
       printf "%s\n" "$pub" > "$outdir/derived_public.pub"
       echo "$MSG_EXPORTED_TO $outdir/derived_private  /  $outdir/derived_public.pub"
+      open_folder_gui "$outdir"
     fi
     echo "$MSG_DONE"; press_enter
   else
@@ -271,7 +322,7 @@ derive_public(){
 
 main_menu(){
   while true; do
-    clear
+    safe_clear
     echo "$MSG_MENU"
     read -r -p "$MSG_CHOICE" c
     case "$c" in
