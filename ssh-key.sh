@@ -5,6 +5,7 @@ set -euo pipefail
 die(){ echo "Error: $*" >&2; exit 1; }
 have(){ command -v "$1" >/dev/null 2>&1; }
 trim(){ awk '{$1=$1}1'; }
+is_yes(){ case "$1" in [Yy]) return 0;; *) return 1;; esac; }
 
 if ! have ssh-keygen; then
   die "ssh-keygen not found. Please install OpenSSH client."
@@ -197,7 +198,7 @@ generate_key(){
   if [[ "$type" == "rsa" ]]; then
     ssh-keygen -t rsa -b "$bits" -N "" -C "$type-$bits-$(timestamp)" -f "$keyfile" >/dev/null
   else
-    ssh-keygen -t ed25519 -a 100 -N "" -C "ed25519-$(timestamp)" -f "$keyfile" >/dev/null
+    ssh-keygen -t ed25519 -a 100 -N "" -C "ed25519-$(timestamp)" -f "$keyfile" >/devnull 2>&1
   fi
 
   echo "$MSG_SHOW_PRIV"
@@ -208,7 +209,7 @@ generate_key(){
   echo
 
   read -r -p "$MSG_EXPORT" ans
-  if [[ "${ans,,}" == "y" ]]; then
+  if is_yes "$ans"; then
     outdir="$(make_export_dir)"
     # give readable names
     if [[ "$type" == "rsa" ]]; then
@@ -255,7 +256,7 @@ derive_public(){
     echo "$pub"
     echo
     read -r -p "$MSG_EXPORT" ans
-    if [[ "${ans,,}" == "y" ]]; then
+    if is_yes "$ans"; then
       outdir="$(make_export_dir)"
       cp "$tmpfile" "$outdir/derived_private"
       printf "%s\n" "$pub" > "$outdir/derived_public.pub"
