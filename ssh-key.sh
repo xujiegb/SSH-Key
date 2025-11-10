@@ -135,7 +135,7 @@ LANG_ID="en"
 
 choose_lang(){
   cat <<'EOF'
-Choose language / 选择语言 / 選擇語言 / Choisir la langue / Выбрать язык / انتخاب زبان / 言語を選択:
+Hello:
   1) English
   2) 简体中文
   3) 繁體中文
