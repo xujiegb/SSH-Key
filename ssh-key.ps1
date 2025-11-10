@@ -169,13 +169,15 @@ function Pause-Enter { Read-Host $T_ENTER | Out-Null }
 function Generate-Key {
   Write-Host $T_ALGO
   $sel = Read-Host ">"
-  $tmp = New-Item -ItemType Directory -Path ([System.IO.Path]::GetTempPath() + [System.Guid]::NewGuid()) -Force
+  $tmpDir = New-Item -ItemType Directory -Path ([System.IO.Path]::GetTempPath() + [System.Guid]::NewGuid()) -Force
+  $tmp = $tmpDir.FullName
   $key = Join-Path $tmp "id_tmp"
+
   switch ($sel) {
-    "1" { & ssh-keygen -t rsa -b 2048  -N "" -C ("rsa-2048-" + (Get-Timestamp)) -f $key | Out-Null }
-    "2" { & ssh-keygen -t rsa -b 3072  -N "" -C ("rsa-3072-" + (Get-Timestamp)) -f $key | Out-Null }
-    "3" { & ssh-keygen -t rsa -b 4096  -N "" -C ("rsa-4096-" + (Get-Timestamp)) -f $key | Out-Null }
-    "4" { & ssh-keygen -t ed25519 -a 100 -N "" -C ("ed25519-" + (Get-Timestamp)) -f $key | Out-Null }
+    "1" { & ssh-keygen @('-t','rsa','-b','2048','-N','','-C',("rsa-2048-" + (Get-Timestamp)),'-f',"$key") | Out-Null }
+    "2" { & ssh-keygen @('-t','rsa','-b','3072','-N','','-C',("rsa-3072-" + (Get-Timestamp)),'-f',"$key") | Out-Null }
+    "3" { & ssh-keygen @('-t','rsa','-b','4096','-N','','-C',("rsa-4096-" + (Get-Timestamp)),'-f',"$key") | Out-Null }
+    "4" { & ssh-keygen @('-t','ed25519','-a','100','-N','','-C',("ed25519-" + (Get-Timestamp)),'-f',"$key") | Out-Null }
     default { Write-Host $T_INVALID; Pause-Enter; return }
   }
 
