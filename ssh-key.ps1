@@ -26,15 +26,29 @@ function Invoke-SSHKeygen {
   if ($p.ExitCode -ne 0) { throw "ssh-keygen failed (exit $($p.ExitCode))" }
 }
 
-# 默认中文
+# 语言选择
 $LangId = "zh-CN"
 Write-Host @"
-Choose language / 选择语言 / 選擇語言:
+Choose language / 选择语言 / 選擇語言 / Choisir la langue / Выбрать язык / انتخاب زبان / 言語を選択:
   1) English
   2) 简体中文
+  3) 繁體中文
+  4) Français
+  5) Русский
+  6) فارسی (ایرانی)
+  7) 日本語
 "@
 $choice = Read-Host ">"
-if ($choice -eq "1") { $LangId="en" }
+switch ($choice) {
+  "1" { $LangId = "en" }
+  "2" { $LangId = "zh-CN" }
+  "3" { $LangId = "zh-TW" }
+  "4" { $LangId = "fr" }
+  "5" { $LangId = "ru" }
+  "6" { $LangId = "fa" }
+  "7" { $LangId = "ja" }
+  default { $LangId = "zh-CN" }
+}
 
 switch ($LangId) {
  "en" {
@@ -50,7 +64,7 @@ switch ($LangId) {
   $T_DONE="Done."
   $T_INVALID="Invalid choice."
  }
- default {
+ "zh-CN" {
   $T_MENU="1) 生成密钥`n2) 由私钥查询公钥`n3) 退出"
   $T_CHOICE="请选择："
   $T_ALGO="选择算法：`n  1) RSA 2048`n  2) RSA 3072`n  3) RSA 4096`n  4) Ed25519"
@@ -62,6 +76,71 @@ switch ($LangId) {
   $T_ENTER="回车继续……"
   $T_DONE="完成。"
   $T_INVALID="无效选择。"
+ }
+ "zh-TW" {
+  $T_MENU="1) 產生金鑰`n2) 由私鑰查詢公鑰`n3) 離開"
+  $T_CHOICE="請選擇："
+  $T_ALGO="選擇演算法：`n  1) RSA 2048`n  2) RSA 3072`n  3) RSA 4096`n  4) Ed25519"
+  $T_INPUT="選擇私鑰輸入方式：`n  1) 貼上文本`n  2) 檔案路徑"
+  $T_PASTE="請貼上【私鑰】，以空行結束，然後連按兩次 Enter："
+  $T_PATH="請輸入檔案路徑："
+  $T_PRIV="--- 私鑰 ---"
+  $T_PUB="--- 公鑰 ---"
+  $T_ENTER="按 Enter 繼續……"
+  $T_DONE="完成。"
+  $T_INVALID="無效選擇。"
+ }
+ "fr" {
+  $T_MENU="1) Générer une clé`n2) Obtenir la clé publique depuis la clé privée`n3) Quitter"
+  $T_CHOICE="Votre choix : "
+  $T_ALGO="Choisir l’algorithme :`n  1) RSA 2048`n  2) RSA 3072`n  3) RSA 4096`n  4) Ed25519"
+  $T_INPUT="Saisir la clé privée par :`n  1) Coller le texte`n  2) Chemin de fichier"
+  $T_PASTE="Collez la CLÉ PRIVÉE (terminez par une ligne vide), puis appuyez deux fois sur Entrée :"
+  $T_PATH="Saisir le chemin du fichier : "
+  $T_PRIV="--- CLÉ PRIVÉE ---"
+  $T_PUB="--- CLÉ PUBLIQUE ---"
+  $T_ENTER="Appuyez sur Entrée pour continuer…"
+  $T_DONE="Terminé."
+  $T_INVALID="Choix invalide."
+ }
+ "ru" {
+  $T_MENU="1) Сгенерировать ключ`n2) Получить публичный ключ из приватного`n3) Выход"
+  $T_CHOICE="Выберите действие: "
+  $T_ALGO="Выберите алгоритм:`n  1) RSA 2048`n  2) RSA 3072`n  3) RSA 4096`n  4) Ed25519"
+  $T_INPUT="Как ввести приватный ключ:`n  1) Вставить текст`n  2) Путь к файлу"
+  $T_PASTE="Вставьте ПРИВАТНЫЙ КЛЮЧ (завершите пустой строкой), затем дважды Enter:"
+  $T_PATH="Введите путь к файлу: "
+  $T_PRIV="--- ПРИВАТНЫЙ КЛЮЧ ---"
+  $T_PUB="--- ПУБЛИЧНЫЙ КЛЮЧ ---"
+  $T_ENTER="Нажмите Enter для продолжения…"
+  $T_DONE="Готово."
+  $T_INVALID="Неверный выбор."
+ }
+ "fa" {
+  $T_MENU="1) تولید کلید`n2) استخراج کلید عمومی از کلید خصوصی`n3) خروج"
+  $T_CHOICE="گزینه را انتخاب کنید: "
+  $T_ALGO="الگوریتم را انتخاب کنید:`n  1) RSA 2048`n  2) RSA 3072`n  3) RSA 4096`n  4) Ed25519"
+  $T_INPUT="ورود کلید خصوصی به یکی از روش‌ها:`n  1) چسباندن متن`n  2) مسیر فایل"
+  $T_PASTE="کلید خصوصی را بچسبانید (با یک خط خالی پایان دهید)، سپس دو بار Enter:"
+  $T_PATH="مسیر فایل را وارد کنید: "
+  $T_PRIV="--- کلید خصوصی ---"
+  $T_PUB="--- کلید عمومی ---"
+  $T_ENTER="برای ادامه Enter را بزنید…"
+  $T_DONE="انجام شد."
+  $T_INVALID="گزینه نامعتبر."
+ }
+ "ja" {
+  $T_MENU="1) 鍵を生成`n2) 秘密鍵から公開鍵を取得`n3) 終了"
+  $T_CHOICE="番号を選択してください: "
+  $T_ALGO="アルゴリズム:`n  1) RSA 2048`n  2) RSA 3072`n  3) RSA 4096`n  4) Ed25519"
+  $T_INPUT="秘密鍵の入力方法:`n  1) テキスト貼り付け`n  2) ファイルパス"
+  $T_PASTE="【秘密鍵】を貼り付け、空行で終了後、Enter を 2 回押してください:"
+  $T_PATH="ファイルパスを入力: "
+  $T_PRIV="--- 秘密鍵 ---"
+  $T_PUB="--- 公開鍵 ---"
+  $T_ENTER="続行するには Enter を押してください…"
+  $T_DONE="完了しました。"
+  $T_INVALID="無効な選択です。"
  }
 }
 
