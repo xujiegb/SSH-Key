@@ -24,7 +24,7 @@ function Open-ExportFolder {
   try { if (Test-Path $Path) { Start-Process -FilePath "explorer.exe" -ArgumentList "`"$Path`"" } } catch {}
 }
 
-# --- 关键修复：用 cmd /c 调用 ssh-keygen，保证 -N "" 传参为空 -----------------
+# --- 修复：不用 ?:，改成 if/else；并用 cmd /c 调 ssh-keygen 以确保 -N "" 真为空 ---
 function Invoke-SSHKeygen {
   param(
     [Parameter(Mandatory)][ValidateSet('rsa','ed25519')]$Type,
@@ -33,14 +33,25 @@ function Invoke-SSHKeygen {
     [Parameter(Mandatory)][string]$Comment,
     [Parameter(Mandatory)][string]$OutFile
   )
-  $bitsPart = ($Type -eq 'rsa' -and $Bits -gt 0) ? "-b $Bits" : ""
-  $kdfPart  = ($Type -eq 'ed25519' -and $KdfRounds -gt 0) ? "-a $KdfRounds" : ""
-  $cmd = "ssh-keygen -q -t $Type $bitsPart $kdfPart -N """" -C ""$Comment"" -f ""$OutFile"""
+
+  $parts = @("ssh-keygen","-q","-t",$Type)
+
+  if ($Type -eq 'rsa' -and $Bits -gt 0) {
+    $parts += @("-b", $Bits)
+  }
+  if ($Type -eq 'ed25519' -and $KdfRounds -gt 0) {
+    $parts += @("-a", $KdfRounds)
+  }
+
+  # -N "" 必须经由 cmd 传递为空字符串，避免 Win 版 ssh-keygen 误判
+  $parts += @("-N", '""', "-C", "`"$Comment`"", "-f", "`"$OutFile`"")
+
+  $cmd = ($parts -join ' ')
   $p = Start-Process -FilePath "cmd.exe" -ArgumentList "/c", $cmd -Wait -PassThru -NoNewWindow
   if ($p.ExitCode -ne 0) { throw "ssh-keygen failed (exit $($p.ExitCode)): $cmd" }
 }
 
-# --- i18n -------------------------------------------------------------------
+# --- i18n ---------------------------------------------------------------
 $LangId = "en"
 Write-Host @"
 Choose language / 选择语言 / 選擇語言 / Choisir la langue / Выбрать язык / انتخاب زبان / 言語を選択:
@@ -133,7 +144,7 @@ switch ($LangId) {
   $T_PATH="Введите путь к файлу: "
   $T_PRIV="--- ПРИВАТНЫЙ КЛЮЧ ---"
   $T_PUB="--- ПУБЛИЧНЫЙ КЛЮЧ ---"
-  $T_EXPORT="Экспортировать в файлы? [y/N]: "
+  $T_EXPORT="Экспортировать в файлы? [y/N] : "
   $T_EXPORTED="Экспортировано в:"
   $T_ENTER="Нажмите Enter для продолжения…"
   $T_DONE="Готово."
